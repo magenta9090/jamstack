@@ -1,0 +1,11 @@
+#!/bin/bash
+cd tmp
+wget -nv $2 -O dlpkg || {
+	exit 255
+}
+cd ../src3p
+tar $1 ../tmp/dlpkg || {
+	exit 255
+}
+cd ..
+rm tmp/dlpkg

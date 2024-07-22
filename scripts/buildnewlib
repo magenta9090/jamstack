@@ -1,0 +1,72 @@
+#!/bin/bash
+
+reset
+
+OLDPWD=`pwd`
+cd $POSBUILDROOT
+
+echo Starting newlib compilation for target $1
+
+LOGDIR="$POSBUILDROOT/log/"
+TCPREFIX="$POSBUILDROOT/toolchains"
+PREFIX="/usr"
+TARGET=$1
+PATH="$TCPREFIX/bin:$PATH"
+TARG_CFGNEWLIB="$POSBUILDROOT/etc/targets/$TARGET/newlib_configure"
+PKG_NEWLIB=`cat etc/pkg_newlib`
+BDIR_NEWLIB="build/newlib-$TARGET"
+SDIR_NEWLIB="$POSBUILDROOT/src3m/$PKG_NEWLIB"
+
+echo newlib package: $PKG_NEWLIB
+
+if [ ! -d "$SDIR_NEWLIB" ]; then
+        echo "No such package: $PKG_NEWLIB" >&2
+        exit 1
+fi
+
+if [ ! -d "$POSBUILDROOT/etc/targets/$TARGET" ]; then
+        echo "No such target: $TARGET" >&2
+        exit 1
+fi
+
+. "$TARG_CFGNEWLIB"
+
+if [ ! -d "$BDIR_NEWLIB" ]; then
+	echo "Creating build directory for newlib: " $BDIR_NEWLIB
+	mkdir "$BDIR_NEWLIB"
+fi
+
+cd "$BDIR_NEWLIB"
+if [ -z "$2" ]; then
+	echo "Configuring newlib..."
+	{
+		$SDIR_NEWLIB/configure --target=$TARGET --prefix="$PREFIX" \
+				$NEWLIB_CFG > "$LOGDIR/cfg_newlib"
+	} || {
+		echo "Failed to configure newlib!" >&2
+		exit 1
+	}
+fi
+
+echo "Building newlib..."
+{
+	make tooldir=$PREFIX DESTDIR="$POSBUILDROOT/sysroot/$TARGET" > "$LOGDIR/make_newlib"
+} || {
+	echo "Failed to build newlib!" >&2
+	exit 1
+}
+
+echo "Installing newlib..."
+{
+	make tooldir=$PREFIX install DESTDIR="$POSBUILDROOT/sysroot/$TARGET" > "$LOGDIR/inst_newlib" &&
+	install "$TARGET/newlib/libc/sys/posnk/crti.o" "$POSBUILDROOT/sysroot/$TARGET/usr/lib/crti.o" &&
+	install "$TARGET/newlib/libc/sys/posnk/crtn.o" "$POSBUILDROOT/sysroot/$TARGET/usr/lib/crtn.o"	
+	
+} || {
+	echo "Failed to install newlib!" >&2
+	exit 1
+}
+
+echo "Done"
+
+cd $OLDPWD

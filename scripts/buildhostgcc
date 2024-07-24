@@ -1,0 +1,73 @@
+#!/bin/bash
+
+reset
+
+OLDPWD=`pwd`
+cd $POSBUILDROOT
+
+echo Starting GCC compilation for target $1
+
+PREFIX="$POSBUILDROOT/toolchains"
+TARGET=$1
+LOGDIR="$POSBUILDROOT/log/"
+PATH="$PREFIX/bin:$PATH"
+TARG_CFGGCC="$POSBUILDROOT/etc/targets/$TARGET/gcc_configure"
+TARG_CFGBUTILS="$POSBUILDROOT/etc/targets/$TARGET/binutils_configure"
+PKG_BUTILS=`cat etc/pkg_binutils`
+PKG_GCC=`cat etc/pkg_gcc`
+BDIR_BUTILS="build/hostbinutils-$TARGET"
+BDIR_GCC="build/hostgcc-$TARGET"
+SDIR_BUTILS="$POSBUILDROOT/src3m/$PKG_BUTILS"
+SDIR_GCC="$POSBUILDROOT/src3m/$PKG_GCC"
+
+echo GCC package: $PKG_GCC
+echo binutils package: $PKG_BUTILS
+
+if [ ! -d "$SDIR_GCC" ]; then
+        echo "No such package: $PKG_GCC" >&2
+        exit 1
+fi
+
+if [ ! -d "$POSBUILDROOT/etc/targets/$TARGET" ]; then
+        echo "No such target: $TARGET" >&2
+        exit 1
+fi
+
+. "$TARG_CFGGCC"
+
+if [ ! -d "$BDIR_GCC" ]; then
+	echo "Creating build directory for gcc: " $BDIR_GCC
+	mkdir "$BDIR_GCC"
+fi
+
+cd "$BDIR_GCC"
+if [ -z "$2" ]; then
+	echo "Configuring GCC..."
+	{
+		$SDIR_GCC/configure --target=$TARGET --prefix="$PREFIX" \
+				$GCC_CFG > "$LOGDIR/cfg_gcc"
+	} || {
+		echo "Failed to configure GCC!" >&2
+		exit 1
+	}
+fi
+
+echo "Building GCC..."
+{
+	make all-gcc > "$LOGDIR/make_gcc"
+} || {
+	echo "Failed to build GCC!" >&2
+	exit 1
+}
+
+echo "Installing GCC..."
+{
+	make install-gcc > "$LOGDIR/install_gcc"
+} || {
+	echo "Failed to build GCC!" >&2
+	exit 1
+}
+
+echo "Done"
+
+cd $OLDPWD
